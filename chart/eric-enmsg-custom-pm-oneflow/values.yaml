@@ -1,0 +1,120 @@
+## eric-enmsg-custom-pm-oneflow image version
+
+global:
+  registry:
+    url:
+    pullSecret:
+  ingress:
+    enmHost:
+  ericIngress:
+    enabled: false
+  enmProperties:
+    postgres_service: postgres
+    COM_INF_LDAP_ROOT_SUFFIX:
+    COM_INF_LDAP_ADMIN_ACCESS:
+    COM_INF_LDAP_ADMIN_CN:
+    COM_INF_LDAP_PORT:
+    dps_persistence_provider:
+  timezone:
+  ip_version: IPv4
+productNumber: CXC 123 4567
+productRevision: RSTATE
+# Number of replicas(pods) to deploy
+replicas-eric-enmsg-custom-pm-oneflow: 2
+images:
+  eric-enm-monitoring:
+    enabled: false
+    name: eric-enm-monitoring-eap7
+    tag: 1.64.0-31
+  eric-enmsg-custom-pm-oneflow:
+    name: eric-enmsg-custom-pm-oneflow
+    tag: VERSION
+  waitForCertificatesContainer:
+    enabled: false
+    name: enm-wait-for-certificates-container
+    tag: 1.52.0-31
+  pm-sdk-models:
+    name: eric-enm-custom-models-pm-oneflow
+    tag: MODEL-VERSION
+  pm-sdk-remove-models:
+    name: eric-enm-custom-remove-models-pm-oneflow
+    tag: REMOVE-MODEL-VERSION
+imageCredentials:
+  repoPath: proj-enm
+  pullPolicy: Always
+  registry:
+    url:
+    pullSecret:
+eric-enm-common-helmchart-library:
+  enabled: true
+service:
+  name: eric-enmsg-custom-pm-oneflow
+  sgname: eric-enmsg-custom-pm-oneflow
+  xmlMountPath: "/ericsson/credm/certReqMount"
+  tlsMountPath: "/ericsson/credm/tlsMount"
+  annotations: {}
+  labels: {}
+# Service Ports to Expose, read from appconfig/servicePorts.txt
+servicePorts:
+  enabled: true
+## Configure resource requests and limits
+## ref: http://kubernetes.io/docs/user-guide/compute-resources/
+resources:
+  requests:
+    enabled: true
+    memory: 7629Mi
+    cpu: 1250m
+  limits:
+    enabled: true
+    memory: 8092Mi
+    cpu: 4200m
+# LivenessProbe Health Check configuration.
+startupProbe:
+  enabled: true
+  command: /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+  arguments: --exec_agents
+  initialDelaySeconds: 10
+  timeoutSeconds: 30
+  periodSeconds: 30
+  failureThreshold: 20
+livenessProbe:
+  enabled: true
+  command: /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+  arguments: --exec_agents
+  initialDelaySeconds: 30
+  timeoutSeconds: 30
+  periodSeconds: 30
+  failureThreshold: 2
+readinessProbe:
+  enabled: true
+  command: /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+  arguments: --exec_agents
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 30
+  failureThreshold: 2
+# Extra Annotations to be added to pod
+podAnnotations: {}
+## Tolerations for pod assignment
+### ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+tolerations: []
+## Affinity for pod assignment
+### ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+affinity: {}
+# Constrain which nodes your pod is eligible to be scheduled on
+### ref:  https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#node-affinity-beta-feature
+nodeAffinity: {}
+### ref: https://kubernetes.io/docs/concepts/configuration/pod-priority-preemption/#pod-priority
+priorityClassName: ""
+## Node selector
+## ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
+nodeSelector: {}
+#https://kubernetes.io/docs/reference/federation/extensions/v1beta1/definitions/#_v1beta1_deploymentstrategy
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
+    maxSurge: 0
+## Pod Disruption Budget is an indicator of the number of disruptions that can be tolerated at a given time.
+podDisruptionBudget:
+  maxUnavailable: 1

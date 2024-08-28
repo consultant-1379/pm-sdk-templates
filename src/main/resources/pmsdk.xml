@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configEntity xmlns="http://www.ericsson.com/oss/itpf/deployment/dst/descriptor">
+  <description>pmsdk</description>
+  <singleton>true</singleton>
+  <scaleUnit>
+    <loadDrivers>
+      <loadDriver name="statsFileRetentionHours" description="PMCPM01-05 Statistics file Retention for up to 3 days.72 Hours" />
+      <!--Referred from mspm -->
+      <loadDriver name="pmsdkCat1PerNodeCpu" description="Calculated Load Driver for Category 1 single node contribution "></loadDriver>
+      <loadDriver name="pmsdkCat1NumNodes" description="Calculated Load Driver for Category 1 number of nodes "></loadDriver>
+      <!-- integrated PM NODES -->
+      <loadDriver name="numberPmSdkIntegratedNe" description="ENM-PMUNSUPP-01 Number of custom SNMP nodes nodes for which PM SNMP gets and file creation can  be supported 600 network element 600 in Small Cloud Native ENM" />
+      <loadDriver name="numberSnmpGetCounterValuesPer15Minute" description="PMST-GPMSF01-01 Total number of counter values supported by SNMP based node in 15MIN ROP, 14K counter values"></loadDriver>
+      <loadDriver name="numberSnmpGetCounterValuesPer24Hrs" description="PMST-GPMSF01-02 Total number of counter values supported by SNMP based node in 24H ROP, 14K counter values"></loadDriver>
+      <!--ENM Reference Deployments-->
+      <loadDriver name="enm_deployment_type" description="ENM Reference Deployment - Extra_Large_ENM,Large_ENM,Large_Transport_only_ENM,Medium_ENM,Small_ENM_customer_cloud,SIENM_multi_technology,SIENM_transport_only,ENM_extra_small,OSIENM_transport_only" />
+    </loadDrivers>
+
+    <minimumUnit>
+      <profile>
+        <cpuCores>4</cpuCores>
+        <cpuMinutes>72</cpuMinutes>
+        <peakCpuMinutes></peakCpuMinutes>
+        <memory>8192</memory>
+      </profile>
+      <profileConversionFormulae>
+        <cpuCores>4</cpuCores>
+        <cpuMinutes>72</cpuMinutes>
+        <peakCpuMinutes></peakCpuMinutes>
+        <memory>0</memory>
+      </profileConversionFormulae>
+    </minimumUnit>
+
+    <optimalUnit>
+      <profile>
+        <cpuCores>4</cpuCores>
+        <cpuMinutes>1677</cpuMinutes>
+        <peakCpuMinutes>0</peakCpuMinutes>
+        <memory>8192</memory>
+      </profile>
+      <profileConversionFormulae>
+        <cpuCores>4</cpuCores>
+        <cpuMinutes>IF(OR(enm_deployment_type="Extra_Large_CloudNative_ENM",enm_deployment_type="Small_CloudNative_ENM"),(pmsdkcpuTimewithNoLoad+(mspmipCat1NumNodes*mspmipCat1PerNodeCpu)),0)</cpuMinutes>
+        <peakCpuMinutes>0</peakCpuMinutes>
+        <memory>0</memory>
+      </profileConversionFormulae>
+    </optimalUnit>
+  </scaleUnit>
+  <parameters>
+    <!--Add parameters if you require any.-->
+    <property name="pmsdkCat1Cpu" defaultValue="731" description="The measured load from a single instance test of base category 6 under worst case load. Break Point established by ROP duration or resources. Base category defined by first tested." usage="OPTIONAL"/>
+    <property name="pmsdkCat1SingleInstanceNumber" defaultValue="600" description="Derived from the number of nodes tested against a single instance for Category 3 of mspmip" usage="OPTIONAL"/>
+    <property name="pmsdkcpuTimewithNoLoad" defaultValue="72" description="derived from mspmip single instance testing as same flows are deployed" usage="OPTIONAL"/>
+
+  </parameters>
+  <deploymentDependencies>
+    <deploymentDependency>
+      <groupId>com.ericsson.nms.litp</groupId>
+      <artifactId>ERICnasprovider_CXPxxxxxx</artifactId>
+      <version/>
+      <alias>PM_stats</alias>
+      <qualifier>GLOBAL</qualifier>
+      <loadDriverConverters>
+        <loadConversionFormula dependencyLoadDriver="nasfileSystemName">ericsson/pm1</loadConversionFormula>
+        <loadConversionFormula dependencyLoadDriver="nasFileSystemSpaceMB">
+          (((pmsdksize15MStatsSnmpNode * pmsdkCat1NumNodes) * averageNumberRopsPerHour * (statsFileRetentionHours+statsAuditFileDeletionServiceIntervalHours)) + ((pmsdksize24HrStatsSnmpNode * pmsdkCat1NumNodes) * ((statsFileRetentionHours+statsAuditFileDeletionServiceIntervalHours)/24)))
+        </loadConversionFormula>
+        <loadConversionFormula dependencyLoadDriver="nasFileSnapSpacePercentage">0</loadConversionFormula>
+      </loadDriverConverters>
+    </deploymentDependency>
+    <deploymentDependency>
+      <groupId>com.ericsson.nms.litp</groupId>
+      <artifactId>ERICenmsgmspmip_CXP9032553</artifactId>
+      <version/>
+      <alias>15MinutePM_stats</alias>
+      <qualifier>GLOBAL</qualifier>
+      <loadDriverConverters>
+         <loadConversionFormula dependencyLoadDriver="pmsdkCat1NumNodes">IF(OR(enm_deployment_type="Extra_Large_CloudNative_ENM",enm_deployment_type="Small_CloudNative_ENM"),numberPmSdkIntegratedNe,0)</loadConversionFormula>
+       <loadConversionFormula dependencyLoadDriver="pmsdksize15MStatsSnmpNode">(sizeStatsSnmpCounterValueInMB * numberSnmpGetCounterValuesPer15Minute) + sizeOfXmlFileOverheadInMB</loadConversionFormula>
+        <loadConversionFormula dependencyLoadDriver="pmsdksize24HrStatsSnmpNode">(sizeStatsSnmpCounterValueInMB * numberSnmpGetCounterValuesPer24Hrs) + sizeOfXmlFileOverheadInMB</loadConversionFormula>
+        <loadConversionFormula dependencyLoadDriver="volumeOf15MinuteDataStoredMB">(pmsdksize15MStatsSnmpNode * (pmsdkCat1NumNodes))</loadConversionFormula>
+        <loadConversionFormula dependencyLoadDriver="volumeOf24HrDataStoredMB">(pmsdksize24HrStatsSnmpNode * (pmsdkCat1NumNodes))</loadConversionFormula>
+        <loadConversionFormula dependencyLoadDriver="volumeOf15minuteSnmpGetCounters">(numberSnmpGetCounterValuesPer15Minute * pmsdkCat1NumNodes)</loadConversionFormula>
+        <loadDriver name="size15MStatsSnmpNode" description="PMST-GPMSF01-01, PMST-GPMSF01-04 Dependency calculation for size of stats file generated every 15 minutes for counters collected using snmp get " />
+        <loadDriver name="size24HrStatsSnmpNode" description="PMST-GPMSF01-02, PMST-GPMSF01-05 Dependency calculation for size of stats file generated every 24 Hours for counters collected using snmp get " />
+
+      </loadDriverConverters>
+    </deploymentDependency>
+  </deploymentDependencies>
+</configEntity>

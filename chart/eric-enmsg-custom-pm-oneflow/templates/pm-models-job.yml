@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.service.name }}-modeljob
+  labels:
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    release: "{{ .Release.Name }}"
+    heritage: "{{ .Release.Service }}"
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 8
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: {{ .Values.service.name }}-modeljob
+          image: {{ .Values.global.registry.url }}/{{ .Values.imageCredentials.repoPath }}/{{ index .Values "images" "pm-sdk-models" "name" }}:{{ index .Values "images" "pm-sdk-models" "tag" }}
+          imagePullPolicy: IfNotPresent
+          env:
+          volumeMounts:
+            - name: mdt
+              mountPath: /etc/opt/ericsson/ERICmodeldeployment
+      volumes:
+        - name: mdt
+          persistentVolumeClaim:
+            claimName: eric-enm-rwxpvc-mdt

@@ -1,0 +1,3 @@
+{{- template "eric-enm-common-helmchart-library.service" (list . "eric-enmsg.service") -}}
+{{- define "eric-enmsg.service" -}}
+{{- end -}}

@@ -1,0 +1,8 @@
+ARG ERIC_ENM_MODELS_CORE_IMAGE_NAME=eric-enm-models-core-image
+ARG ERIC_ENM_MODELS_CORE_IMAGE_REPO=armdocker.rnd.ericsson.se/proj-enm
+ARG ERIC_ENM_MODELS_CORE_IMAGE_TAG=latest
+
+# as of now using latest will change when the core docker file is merged
+FROM ${ERIC_ENM_MODELS_CORE_IMAGE_REPO}/${ERIC_ENM_MODELS_CORE_IMAGE_NAME}:${ERIC_ENM_MODELS_CORE_IMAGE_TAG}
+
+COPY image_content_removemodels/*.rpm /ericsson/customModelRpms/

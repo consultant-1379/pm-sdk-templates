@@ -1,0 +1,15 @@
+- name: jboss
+  port: 8080
+  targetPort: 8080
+- name: ejb
+  port: 4447
+  targetPort: 4447
+- name: mediation-2
+  port: 59001
+  targetPort: 59001
+- name: mediation-1
+  port: 59010
+  targetPort: 59010
+- name: metrics
+  port: 9600
+  targetPort: 9600

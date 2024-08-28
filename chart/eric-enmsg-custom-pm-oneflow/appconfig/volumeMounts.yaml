@@ -1,0 +1,30 @@
+- name: certreq-secret-1
+  mountPath: {{ .Values.service.xmlMountPath }}/xml1
+  readOnly: true
+- name: certreq-secret-2
+  mountPath: {{ .Values.service.xmlMountPath }}/xml2
+  readOnly: true
+- name: gp
+  mountPath: /gp
+- name: data
+  mountPath: /ericsson/tor/data
+- name: mdt
+  mountPath: /etc/opt/ericsson/ERICmodeldeployment
+- name: custom
+  mountPath: /ericsson/custom
+- name: dumps
+  mountPath: /ericsson/enm/dumps
+- name: configmgt
+  mountPath: /ericsson/config_mgt
+- name: upgind
+  mountPath: /ericsson/configuration_management/UpgradeIndependence
+- name: pmic1
+  mountPath: /ericsson/pmic1
+- name: pmic2
+  mountPath: /ericsson/pmic2
+- name: pmlinks
+  mountPath: /ericsson/symvol
+- name: norollback
+  mountPath: /ericsson/tor/no_rollback
+- name: dlms
+  mountPath: /ericsson/enm/dlms/history/data

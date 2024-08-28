@@ -1,0 +1,9 @@
+NAME=eric-enmsg-custom-pm-oneflow
+DEP=true
+REQUESTS=true
+REQUESTS_LIST=4096Mi
+LIMITS=true
+LIMITS_LIST=8192Mi
+WAIT=true
+WAIT_LIST=neo4j,gossiprouter-cache,gossiprouter-eap7,jms01,postgres,sps
+SVC=custom-pm-oneflow

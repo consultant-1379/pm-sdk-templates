@@ -1,0 +1,7 @@
+{{- template "eric-enm-common-helmchart-library.deployment" (list . "eric-enmsg.deployment") -}}
+{{- define "eric-enmsg.deployment" -}}
+metadata:
+  labels:
+    sdkshutstart: active
+    sdk: "true"
+{{- end -}}

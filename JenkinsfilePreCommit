@@ -1,0 +1,247 @@
+#!/usr/bin/env groovy
+
+/* IMPORTANT:
+ *
+ * In order to make this pipeline work, the following configuration on Jenkins is required:
+ * - slave with a specific label (see pipeline.agent.label below)
+ * - credentials plugin should be installed and have the secrets with the following names:
+ *   + lciadm100credentials (token to access Artifactory)
+ */
+
+def defaultBobImage = 'armdocker.rnd.ericsson.se/sandbox/adp-staging/adp-cicd/bob.2.0:1.7.0-55'
+def bob = new BobCommand()
+        .bobImage(defaultBobImage)
+        .envVars([ISO_VERSION: '${ISO_VERSION}', RELEASE: 'false' ])
+        .needDockerSocket(true)
+        .toString()
+def GIT_COMMITTER_NAME = 'lciadm100'
+def GIT_COMMITTER_EMAIL = 'lciadm100@ericsson.com'
+def failedStage = ''
+pipeline {
+    agent {
+        label 'Cloud-Native'
+    }
+	environment{
+        repositoryUrl = "https://arm2s11-eiffel004.eiffel.gic.ericsson.se:8443/nexus/content/repositories/cloud-native-enm-sdk/templates"
+        CSAR_PACKAGE_NAME = "pm-sdk-templates"
+        OPENIDM = "eric-enm-openidm-change-password:latest"
+        PASSKEY = "eric-enm-securestorage-regen-passkey:latest"
+        OPENIDM_IMAGE_PATH = "armdocker.rnd.ericsson.se/proj-enm"
+        PASSKEY_IMAGE_PATH = "armdocker.rnd.ericsson.se/proj-enm"
+        PACKAGE_TYPE="ci-internal"
+        ERIC_ENM_PMSDK_IMAGE_TAG="1.0.0"
+        CENMBUILD_ARM_TOKEN = credentials('cenmbuild_ARM_token')
+        RELEASE = "false"
+    }
+    parameters {
+        string(name: 'ISO_VERSION', defaultValue: '0.0.0', description: 'The ENM ISO version (e.g. 1.65.77)')
+    }
+    stages {
+        stage('Inject Credential Files') {
+            steps {
+                withCredentials([file(credentialsId: 'lciadm100-docker-auth', variable: 'dockerConfig')]) {
+                    sh "install -m 600 ${dockerConfig} ${HOME}/.docker/config.json"
+                }
+            }
+        }
+        stage('Checkout Cloud-Native Git Repository ') {
+            steps {
+                script {
+                    if (env.GERRIT_CHANGE_NUMBER) {
+                        checkout changelog: true, \
+                        scm: [$class: 'GitSCM', \
+                        branches: [[name: "$GERRIT_REFSPEC"]], \
+                        doGenerateSubmoduleConfigurations: false, \
+                        extensions: [[$class: 'BuildChooserSetting', buildChooser: [$class: 'GerritTriggerBuildChooser']]], \
+                        submoduleCfg: [], \
+                        userRemoteConfigs: [[refspec: "${GERRIT_REFSPEC}", \
+                        url: "${GERRIT_MIRROR}/${GERRIT_PROJECT}"]]]
+                    } else {
+                        println "No GERRIT_CHANGE_NUMBER"
+                        git changelog: true, poll: false, url: '${GERRIT_MIRROR}/${REPO}'
+                    }
+                }
+            }
+        }
+        stage('Helm Dep Up ') {
+            steps {
+                sh "${bob} helm-dep-up"
+            }
+            post {
+                failure {
+                    script {
+                        failedStage = env.STAGE_NAME
+                    }
+                }
+            }
+        }
+        stage('Merge values files') {
+            steps{
+                 script {
+                     appconfig_values = sh (script: "ls ${WORKSPACE}/chart/eric-enmsg-custom-pm-oneflow/appconfig/ | grep values.yaml", returnStatus: true)
+                     if (appconfig_values == 0) {
+                          sh("${bob} merge-values-files-with-appconfig")
+                     } else {
+                          sh("${bob} merge-values-files")
+                     }
+                     sh '''
+                         if git status | grep 'values.yaml' > /dev/null; then
+                            git add chart/eric-enmsg-custom-pm-oneflow/values.yaml
+                            git commit -m "NO JIRA - Merging Values.yaml file with common library values.yaml"
+                         fi
+                     '''
+                }
+            }
+            post {
+                failure {
+                    script {
+                        failedStage = env.STAGE_NAME
+                    }
+                }
+            }
+        }
+        stage('Helm Lint') {
+            steps {
+                sh "${bob} lint-helm"
+            }
+            post {
+                failure {
+                    script {
+                        failedStage = env.STAGE_NAME
+                    }
+                }
+            }
+        }
+        stage('Linting Dockerfile') {
+            steps {
+                sh "${bob} lint-dockerfile"
+                archiveArtifacts '*dockerfilelint.log'
+            }
+            post {
+                failure {
+                    script {
+                        failedStage = env.STAGE_NAME
+                    }
+                }
+            }
+        }
+        stage('ADP Helm Design Rule Check') {
+            steps {
+                sh "${bob} test-helm || true"
+                archiveArtifacts 'design-rule-check-report.*'
+            }
+            post {
+                failure {
+                    script {
+                        failedStage = env.STAGE_NAME
+                    }
+                }
+            }
+        }
+        stage('Generate new version') {
+            steps {
+                sh "${bob} generate-new-version"
+                script {
+                    env.VERSION = sh(script: "cat .bob/var.version", returnStdout:true).trim()
+                    echo "Generated VERSION is: ${VERSION}"
+                    env.RSTATE = sh(script: "cat .bob/var.rstate", returnStdout:true).trim()
+                    echo "Generated RSTATE is: ${RSTATE}"
+                }
+            }
+            post {
+                failure {
+                    script {
+                        failedStage = env.STAGE_NAME
+                    }
+                }
+            }
+        }
+        stage('Swap versions in Dockerfile and values.yaml file'){
+            steps{
+                echo sh(script: 'env', returnStdout:true)
+                step ([$class: 'CopyArtifact', projectName: 'sync-build-trigger', filter: "*"]);
+                sh "${bob} swap-latest-versions-with-numbers"
+                sh "sed -i s/ERIC_ENM_PMSDK_IMAGE_TAG=.*/ERIC_ENM_PMSDK_IMAGE_TAG=${env.ERIC_ENM_PMSDK_IMAGE_TAG}/g Dockerfile"
+            }
+        }
+
+        stage('Generate PMSDK templates tar/zip file ') {
+            steps {
+                sh "${bob} generate-pmsdk-pre-code-review"
+            }
+            post {
+                failure {
+                    script {
+                        failedStage = env.STAGE_NAME
+                    }
+                }
+            }
+        }
+        stage('Generate ADP Parameters') {
+            steps {
+                sh "${bob} generate-output-parameters-internal-stage"
+                archiveArtifacts 'artifact.properties'
+            }
+            post {
+                failure {
+                    script {
+                        failedStage = env.STAGE_NAME
+                    }
+                }
+            }
+        }
+        stage('Publish zip File Package to Nexus') {
+            steps {
+              script {
+                  env.filesize = sh(script: "du -h build/${CSAR_PACKAGE_NAME}-${VERSION}.tar.gz | cut -f1", returnStdout: true).trim()
+                  sh "bash upload_to_nexus.sh ${VERSION} build/${CSAR_PACKAGE_NAME}-${VERSION}.tar.gz ${repositoryUrl} ${CSAR_PACKAGE_NAME} ${PACKAGE_TYPE}"
+              }
+            }
+        }
+    }
+    post {
+        failure {
+            mail to: '${GERRIT_CHANGE_OWNER_EMAIL},${GERRIT_PATCHSET_UPLOADER_EMAIL}',
+                    subject: "Failed Pipeline: ${currentBuild.fullDisplayName}",
+                    body: "Failure on ${env.BUILD_URL}"
+        }
+    }
+}
+
+// More about @Builder: http://mrhaki.blogspot.com/2014/05/groovy-goodness-use-builder-ast.html
+import groovy.transform.builder.Builder
+import groovy.transform.builder.SimpleStrategy
+
+@Builder(builderStrategy = SimpleStrategy, prefix = '')
+class BobCommand {
+    def bobImage = 'bob.2.0:latest'
+    def envVars = [:]
+    def needDockerSocket = false
+
+    String toString() {
+        def env = envVars
+                .collect({ entry -> "-e ${entry.key}=\"${entry.value}\"" })
+                .join(' ')
+
+        def cmd = """\
+            |docker run
+            |--init
+            |--rm
+            |--workdir \${PWD}
+            |--user \$(id -u):\$(id -g)
+            |-v \${PWD}:\${PWD}
+            |-v /etc/group:/etc/group:ro
+            |-v /etc/passwd:/etc/passwd:ro
+            |-v \${HOME}/.m2:\${HOME}/.m2
+            |${needDockerSocket ? '-v /var/run/docker.sock:/var/run/docker.sock' : ''}
+            |${env}
+            |\$(for group in \$(id -G); do printf ' --group-add %s' "\$group"; done)
+            |--group-add \$(stat -c '%g' /var/run/docker.sock)
+            |${bobImage}
+            |"""
+        return cmd
+                .stripMargin()           // remove indentation
+                .replace('\n', ' ')      // join lines
+                .replaceAll(/[ ]+/, ' ') // replace multiple spaces by one
+    }
+}

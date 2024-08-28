@@ -1,0 +1,5 @@
+dependencies:
+- condition: eric-enm-common-helmchart-library.enabled
+  name: eric-enm-common-helmchart-library
+  repository: https://arm.epk.ericsson.se/artifactory/proj-enm-helm/
+  version: 1.24.0-2
